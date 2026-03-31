@@ -3,7 +3,28 @@ import numpy as np
 from astrometry.util.ttime import Time
 from tractor.engine import logverb, OptResult, logmsg
 
+import numba
 
+@numba.njit(fastmath=True, nogil=True)
+def fast_add_to(mod_img, patch_data, counts, x0, y0):
+    img_h, img_w = mod_img.shape
+    patch_h, patch_w = patch_data.shape
+
+    # 1. Equivalent to get_overlapping_region for Y
+    y_start = max(0, -y0)
+    y_end = min(patch_h, img_h - y0)
+    
+    # 2. Equivalent to get_overlapping_region for X
+    x_start = max(0, -x0)
+    x_end = min(patch_w, img_w - x0)
+
+    # 3. Add to image (avoids empty list checks, if start >= end, loop just doesn't run)
+    for y in range(y_start, y_end):
+        for x in range(x_start, x_end):
+            # mod_img[y0 + y, x0 + x] is the 'out' coordinate
+            # patch_data[y, x] is the 'in' coordinate
+            mod_img[y0 + y, x0 + x] += patch_data[y, x] * counts
+        
 class Optimizer(object):
     def optimize(self, tractor, alphas=None, damp=0, priors=True,
                  scale_columns=True, shared_params=True, variance=False,
@@ -220,6 +241,7 @@ class Optimizer(object):
             # print '  ', nzero, 'components are zero'
             umodels.append(umods)
         return umodels, umodtosource, umodsforsource
+
 
     def _optimize_forcedphot_core(
             self, tractor,
@@ -531,7 +553,8 @@ class Optimizer(object):
                 assert(np.isfinite(counts))
                 assert(np.all(np.isfinite(um.patch)))
                 # print 'Adding umod', um, 'with counts', counts, 'to mod', mod.shape
-                (um * counts).addTo(mod)
+                # (um * counts).addTo(mod)
+                fast_add_to(mod, um.patch, counts, um.x0, um.y0)
 
             ie = img.getInvError()
             im = img.getImage()

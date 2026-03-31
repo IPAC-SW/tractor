@@ -28,7 +28,8 @@ class LsqrOptimizer(Optimizer):
             for um, dd in zip(umods, derivs):
                 if um is None:
                     continue
-                dd.append((um * scale, tim))
+                dd.append((um , scale, tim)) # When you do um * scale,
+                # Tractor’s Patch.__mul__ allocates a new numpy array, increasing memory
         #logverb('forced phot: derivs', Time() - t0)
         if sky:
             # Sky derivatives are part of the image derivatives, so go
@@ -369,7 +370,11 @@ class LsqrOptimizer(Optimizer):
         imgoffs = {}
         nextrow = 0
         for param in allderivs:
-            for deriv, img in param:
+            for item in param:
+                if len(item) == 3:
+                    deriv, deriv_scale, img = item
+                else:
+                    deriv, img = item
                 if img in imgoffs:
                     continue
                 imgoffs[img] = nextrow
@@ -389,7 +394,14 @@ class LsqrOptimizer(Optimizer):
             RR = []
             VV = []
             WW = []
-            for (deriv, img) in param:
+            for item in param:
+                
+                if len(item) == 3:
+                    deriv, deriv_scale, img = item
+                else:
+                    deriv, img = item
+                    deriv_scale = 1.0
+
                 inverrs = img.getInvError()
                 (H, W) = img.shape
                 row0 = imgoffs[img]
@@ -409,7 +421,7 @@ class LsqrOptimizer(Optimizer):
                     continue
                 rows = row0 + pix[nz]
                 #print('Adding derivative', deriv.getName(), 'for image', img.name)
-                vals = dimg.flat[nz]
+                vals = dimg.flat[nz] * deriv_scale
                 w = inverrs[deriv.getSlice(img)].flat[nz]
                 assert(vals.shape == w.shape)
                 # if not scales_only:
@@ -669,7 +681,6 @@ class LsqrOptimizer(Optimizer):
             return X, 1./np.array(var)
 
         return X
-
     # def getParameterScales(self):
     #     print(self.getName()+': Finding derivs...')
     #     allderivs = self.getDerivs()
