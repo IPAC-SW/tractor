@@ -5,6 +5,8 @@ import sys
 import functools
 
 import numpy as np
+from cv2 import filter2D, BORDER_CONSTANT
+from numba import njit
 
 from tractor.image import Image
 from tractor.pointsource import PointSource
@@ -23,39 +25,84 @@ if sys.version_info[0] == 2:
         return int(__builtin__.round(float(x)))
 
 mp_fourier = -1
-def lanczos_shift_image(img, dx, dy, inplace=False, force_python=False):
-    global mp_fourier
-    if mp_fourier == -1:
-        try:
-            from tractor import mp_fourier
-        except:
-            print('tractor.psf: failed to import C version of mp_fourier library.  Falling back to python version.')
-            mp_fourier = None
 
-    H,W = img.shape
-    if (mp_fourier is None or force_python or W <= 8 or H <= 8
-        or H > work_corr7f.shape[0] or W > work_corr7f.shape[1]):
-        # fallback to python:
-        from scipy.ndimage import correlate1d
-        from astrometry.util.miscutils import lanczos_filter
-        L = 3
-        Lx = lanczos_filter(L, np.arange(-L, L+1) + dx)
-        Ly = lanczos_filter(L, np.arange(-L, L+1) + dy)
-        # Normalize the Lanczos interpolants (preserve flux)
-        Lx /= Lx.sum()
-        Ly /= Ly.sum()
-        sx     = correlate1d(img, Lx, axis=1, mode='constant')
-        outimg = correlate1d(sx,  Ly, axis=0, mode='constant')
-        return outimg
+@njit
+def lanczos_filter(order: int, axis_array: np.ndarray) -> np.ndarray:
+    """Apply Lanczos kernel.
 
-    outimg = np.empty(img.shape, np.float32)
-    mp_fourier.lanczos_shift_3f(img.astype(np.float32), outimg, dx, dy,
-                                work_corr7f)
-    # yuck!  (don't change this without ensuring the "restrict"
-    # keyword still applies in lanczos_shift_3f!)
+    Parameters
+    ----------
+    order : `int`
+        Positive integer determining the size of the kernel.
+    axis_array : `numpy.ndarray`
+        Abscissae/ordinates of the kernel.
+
+    Returns
+    -------
+    kernel : `numpy.ndarray`
+        Normalized Lanczos kernel.
+
+    Notes
+    -----
+    In `astrometry.utils.miscutils`, this function is a vectorized NumPy
+    implementation that optionally writes into a pre-allocated output array
+    and returns an unnormalized kernel. The forked function is adapted for
+    Numba JIT compilation, and normalizes the kernel before returning.
+    """
+    kernel = np.empty(axis_array.shape, dtype="float")
+    for i in range(axis_array.size):
+        # Evaluate function along subdomains
+        # L(x)= / sinc(x) * sinc(x/order)   -order <= x < order; x/=0
+        #       \ 0                         otherwise
+        if abs(axis_array[i]) >= order:
+            kernel[i] = 0.0
+        else:
+            kernel[i] = np.sinc(axis_array[i]) * np.sinc(axis_array[i]/order)
+    kernel /= np.sum(kernel)
+    return kernel
+
+def lanczos_shift_image(img: np.ndarray, dx: float, dy: float, l_order: int = 3,
+                        inplace: bool = False) -> np.ndarray:
+    """Shift the given image with Lanczos resampling.
+
+    Parameters
+    ----------
+    img : `np.ndarray`
+        Input 2-dimensional image to shift.
+    dx, dy : `float`
+        Amount of shift along the x- and y-axis, respectively (axis ``1`` and
+        ``0`` in default Numpy array, respectively).
+    l_order : `int`, optional
+        Order of Lanczos filter. Default is 3.
+    inplace : `bool`, optional
+        If True, modify the input image in place. Default is False.
+
+    Returns
+    -------
+    out_img : `np.ndarray`
+        Shifted 2-dimensional image.
+
+    Notes
+    -----
+    The upstream function applies the 1-D Lanczos filter along both axes as a
+    fallback when the C extension for 2-D image shifting is not available. The
+    forked function extracts the kernel computation as a standalone utility,
+    independent of the image-shifting context.  
+    """
+    _a = np.arange(-l_order, l_order + 1)
+    l_x = lanczos_filter(l_order, _a + dx).astype(np.float32)  # x kernel
+    l_y = lanczos_filter(l_order, _a + dy).astype(np.float32)  # y kernel
+
+    # NOTE: Working with OpenCV requires a C-contiguous image array and
+    # same-precision types for the kernels/image.
+    sx = filter2D(np.ascontiguousarray(img.astype(np.float32)), -1, l_x[np.newaxis, :],
+                  borderType=BORDER_CONSTANT)
+    out_img = filter2D(np.ascontiguousarray(sx), -1, l_y[:, np.newaxis], borderType=BORDER_CONSTANT)
+
     if inplace:
-        img[:,:] = outimg
-    return outimg
+        img[:, :] = out_img
+
+    return out_img
 
 # GLOBAL scratch array for lanczos_shift_image!
 work_corr7f = np.zeros((4096, 4096), np.float32)

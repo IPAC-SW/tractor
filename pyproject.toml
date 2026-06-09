@@ -1,3 +1,18 @@
 [build-system]
-requires = ["setuptools>=64", "wheel", "numpy"]
+requires = ["setuptools>=64", "setuptools_scm", "wheel", "numpy", "opencv-python-headless"]
 build-backend = "setuptools.build_meta"
+
+[project]
+name = "tractor"
+authors = [
+    {name = "Dustin Lang", email = "dstndstn@gmail.com"},
+    {name = "David W. Hogg"},
+]
+dynamic = ["version"]
+dependencies = [
+    "numba",
+    "numpy",
+    "opencv-python-headless"
+]
+
+[tools.setuptools_scm]
