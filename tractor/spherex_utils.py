@@ -1,3 +1,13 @@
+# This file is part of the `tractor-spherex` fork of the Tractor
+# (https://github.com/Caltech-IPAC/tractor-spherex), created for the NASA SPHEREx
+# mission's use by the SPHEREx Science Data Center team at Caltech/IPAC.
+#
+# Copyright (C) 2026, California Institute of Technology.
+# Licensed under the GNU General Public License, version 2 (GPLv2),
+# the same as the Tractor. See LICENSE/COPYING.
+#
+# This file provides PSF models specific to SPHEREx.
+
 # Related third party imports
 from astrometry.util.miscutils import get_overlapping_region
 from cv2 import INTER_AREA, resize

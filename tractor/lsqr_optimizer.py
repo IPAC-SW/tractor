@@ -1,3 +1,14 @@
+# --- Fork modification notice ---
+# This file is part of the `tractor-spherex` fork of the Tractor
+# (https://github.com/Caltech-IPAC/tractor-spherex), created for the NASA SPHEREx
+# mission's use by the SPHEREx Science Data Center team at Caltech/IPAC.
+# It differs from the upstream [`dstndstn/tractor`](https://github.com/dstndstn/tractor).
+# The Tractor is licensed under GPLv2; see LICENSE/COPYING.
+#
+# Changes in this fork are copyright (C) 2026, California Institute of
+# Technology:
+#   2026-03-03  Performance optimizations
+
 from __future__ import print_function
 import numpy as np
 from astrometry.util.ttime import Time
