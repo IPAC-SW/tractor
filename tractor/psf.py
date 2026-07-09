@@ -98,7 +98,7 @@ def lanczos_shift_image(img: np.ndarray, dx: float, dy: float, l_order: int = 3,
     The upstream function applies the 1-D Lanczos filter along both axes as a
     fallback when the C extension for 2-D image shifting is not available. The
     forked function extracts the kernel computation as a standalone utility,
-    independent of the image-shifting context.  
+    independent of the image-shifting context.
     """
     _a = np.arange(-l_order, l_order + 1)
     l_x = lanczos_filter(l_order, _a + dx).astype(np.float32)  # x kernel
@@ -115,9 +115,9 @@ def lanczos_shift_image(img: np.ndarray, dx: float, dy: float, l_order: int = 3,
 
     return out_img
 
-# GLOBAL scratch array for lanczos_shift_image!
-work_corr7f = np.zeros((4096, 4096), np.float32)
-work_corr7f = np.require(work_corr7f, requirements=['A'])
+# # GLOBAL scratch array for lanczos_shift_image!
+# work_corr7f = np.zeros((4096, 4096), np.float32)
+# work_corr7f = np.require(work_corr7f, requirements=['A'])
 
 class HybridPSF(object):
     pass
@@ -211,7 +211,7 @@ class PixelizedPSF(BaseParams, ducks.ImageCalibration):
             cy = H//2
             img = img[max(cy-R, 0) : min(cy+R+1,H-1),
                       max(cx-R, 0) : min(cx+R+1,W-1)]
-            
+
         H, W = img.shape
         # float() required because builtin round(np.float64(11.0)) returns 11.0 !!
         ix = round(float(px))
@@ -671,7 +671,7 @@ class HybridPixelizedPSF(HybridPSF):
     def copy(self):
         s = self.__class__(self.pix.copy(), self.gauss.copy())
         return s
-        
+
     def getMixtureOfGaussians(self, **kwargs):
         return self.gauss.getMixtureOfGaussians(**kwargs)
 
